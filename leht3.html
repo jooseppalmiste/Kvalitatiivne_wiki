@@ -16,7 +16,8 @@
               }
               LIMIT 10
            `;
-           let aadress="https://query.wikidata.org/sparql?format=json&query="+encodeURI(lause);      
+           let aadress="https://query.wikidata.org/sparql?format=json&query="+encodeURI(lause);
+          vastus.innerHTML="ootan vastust";
            fetch(aadress).then(d => d.json()).then(kuva);
         }
 
@@ -38,6 +39,12 @@
         <option value="Q191">Eesti</option>
        <option value="Q145">SB</option>
     </select>
+    <select id="amet" onchange="kysi()">
+      <option value="Q36180">Kirjanik</option>
+      <option value="Q201788">Ajaloolane</option>
+      <option value="Q49757">Luuletaja</option>
+      <option value="Q17125263">Juutuuber</option>
+   </select>  
      <input type="button" value="otsi" onclick="kysi()" />
      <ul id="vastus"></ul>
   </body>
