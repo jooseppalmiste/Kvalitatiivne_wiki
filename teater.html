@@ -1,50 +1,106 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="et">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Eesti teatriinimesed Wikidatas</title>
-<style>
-:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#20252b;background:#f5f3f0}*{box-sizing:border-box}body{margin:0}
-header{background:#251c2c;color:white;padding:48px max(24px,calc((100% - 1040px)/2))}header p{color:#e4d9ea;max-width:650px;line-height:1.55}h1{font-size:clamp(30px,5vw,52px);margin:0 0 10px}h2{margin:0 0 12px;font-size:22px}main{max-width:1040px;margin:auto;padding:26px 18px 65px}.card{background:white;border:1px solid #e5e0e5;border-radius:15px;padding:24px;margin:15px 0;box-shadow:0 2px 8px #271b2d08}.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}label{display:block;font-size:13px;font-weight:700;margin:0 0 7px}select,input{width:100%;border:1px solid #cec5ce;border-radius:8px;padding:11px;background:white;color:#29222d;font-size:15px}button{border:0;border-radius:8px;background:#683b74;color:white;font-weight:700;padding:12px 19px;cursor:pointer}button:hover{background:#50295b}button:disabled{opacity:.6;cursor:wait}.bar{display:flex;align-items:center;gap:13px;flex-wrap:wrap;margin-top:17px}.subtle{color:#66606a;font-size:14px;line-height:1.55}.notice{background:#f6eff9;border-left:4px solid #85508f;padding:13px;border-radius:5px}.status{min-height:22px;color:#584864}.tablewrap{overflow-x:auto}table{border-collapse:collapse;width:100%;text-align:left}th,td{padding:11px 10px;border-bottom:1px solid #eee9ed}th{font-size:13px;color:#59515a}td{font-size:14px}a{color:#663b78}pre{overflow:auto;white-space:pre-wrap;word-break:break-word;background:#211a28;color:#f7eefe;padding:16px;border-radius:10px;font-size:12px;line-height:1.5}details{margin-top:14px}summary{cursor:pointer;font-weight:650}.track{height:10px;border-radius:9px;background:#f1e9f4;overflow:hidden}.fill{height:100%;background:#835190;border-radius:9px}.school{display:grid;grid-template-columns:minmax(145px,1fr) 2fr 40px;align-items:center;gap:12px;margin:13px 0;font-size:14px}.stats{display:flex;gap:25px;flex-wrap:wrap}.stat strong{font-size:32px;display:block;color:#5f3572}.stat span{color:#66606a;font-size:13px}footer{font-size:13px;color:#6c6570;text-align:center;margin-top:24px}@media(max-width:570px){.card{padding:17px}.school{grid-template-columns:1fr 1fr 30px}header{padding:35px 22px}}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Eesti teater Wikidatas</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 700px; margin: 35px auto; padding: 0 15px; line-height: 1.5; }
+    h1 { font-size: 25px; }
+    h2 { font-size: 19px; margin-top: 30px; }
+    select, button { padding: 7px; font-size: 15px; }
+    .vastus { margin: 13px 0; }
+    ul { padding-left: 22px; }
+    li { margin-bottom: 5px; }
+    .selgitus { font-size: 13px; color: #555; }
+  </style>
+  <script>
+    function kysi() {
+      let riigikood = document.getElementById("riik").value;
+
+      // Päring 1: mitu inimest on korraga näitlejad ja teatrilavastajad?
+      let lause1 = `
+        SELECT (COUNT(DISTINCT ?isik) AS ?kogus)
+        WHERE
+        {
+          ?isik wdt:P27 wd:${riigikood}.
+          ?isik wdt:P106 wd:Q33999.
+          ?isik wdt:P106 wd:Q3387717.
+        }
+      `;
+
+      // Päring 2: millistes koolides on teatrilavastajad õppinud?
+      let lause2 = `
+        SELECT ?kool ?koolLabel (COUNT(DISTINCT ?isik) AS ?kogus)
+        WHERE
+        {
+          ?isik wdt:P27 wd:${riigikood}.
+          ?isik wdt:P106 wd:Q3387717.
+          ?isik wdt:P69 ?kool.
+
+          SERVICE wikibase:label {
+            bd:serviceParam wikibase:language "et,en".
+          }
+        }
+        GROUP BY ?kool ?koolLabel
+        ORDER BY DESC(?kogus)
+      `;
+
+      let vastus1 = document.getElementById("vastus1");
+      let vastus2 = document.getElementById("vastus2");
+      vastus1.textContent = "Ootan vastust...";
+      vastus2.textContent = "Ootan vastust...";
+
+      let aadress1 = "https://query.wikidata.org/sparql?format=json&query=" + encodeURIComponent(lause1);
+      let aadress2 = "https://query.wikidata.org/sparql?format=json&query=" + encodeURIComponent(lause2);
+
+      fetch(aadress1)
+        .then(d => { if (!d.ok) throw new Error("HTTP " + d.status); return d.json(); })
+        .then(d => {
+          let kogus = d.results.bindings[0]?.kogus?.value ?? "0";
+          vastus1.textContent = "Näitlejaid, kes on ka teatrilavastajad: " + kogus;
+        })
+        .catch(() => { vastus1.textContent = "Päring ei õnnestunud. Proovi uuesti."; });
+
+      fetch(aadress2)
+        .then(d => { if (!d.ok) throw new Error("HTTP " + d.status); return d.json(); })
+        .then(d => {
+          vastus2.textContent = "";
+          let read = d.results.bindings;
+          if (read.length === 0) {
+            vastus2.textContent = "Koolide kohta andmeid ei leitud.";
+            return;
+          }
+          let loend = document.createElement("ul");
+          for (let rida of read) {
+            let li = document.createElement("li");
+            li.textContent = rida.koolLabel.value + " — " + rida.kogus.value + " lavastajat";
+            loend.appendChild(li);
+          }
+          vastus2.appendChild(loend);
+        })
+        .catch(() => { vastus2.textContent = "Päring ei õnnestunud. Proovi uuesti."; });
+    }
+    window.addEventListener("DOMContentLoaded", kysi);
+  </script>
 </head>
 <body>
-<header><div style="font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:#d4bddc">Kultuuriteadused · Wikidata · SPARQL</div><h1>Eesti teatriinimesed</h1><p>Uuri, milliseid Eesti näitlejaid ja teatrilavastajaid kirjeldab Wikidata ning milline haridustaust on nende kirjete põhjal nähtav.</p></header>
-<main>
-<section class="card"><h2>Muuda otsingu parameetreid</h2><p class="subtle">Mõlemad päringud kasutavad sama filtrivalikut. Andmed pärinevad otse Wikidata avalikust päringuteenusest.</p>
-<div class="controls">
-<div><label for="job">Amet</label><select id="job"><option value="Q33999">Näitleja</option><option value="Q3387717">Teatrilavastaja</option></select></div>
-<div><label for="gender">Sugu</label><select id="gender"><option value="all">Kõik</option><option value="Q6581097">Mehed</option><option value="Q6581072">Naised</option></select></div>
-<div><label for="year">Sündinud alates aastast</label><input id="year" type="number" min="1800" max="2026" step="1" placeholder="Kõik aastad"></div>
-<div><label for="limit">Maksimaalne kirjete arv</label><select id="limit"><option>25</option><option selected>50</option><option>100</option><option>200</option></select></div>
-</div><div class="bar"><button id="go">Käivita mõlemad päringud</button><span id="status" class="status" role="status" aria-live="polite">Valmis päringuteks.</span></div></section>
-<section class="card"><h2>1. päring: teatriinimeste nimekiri</h2><p class="subtle">Valitud ameti ja filtrite järgi Eesti kodakondsusega inimesed. Sünniaasta või sugu kuvatakse ainult siis, kui vastav väli on Wikidatas olemas.</p><div id="stats" class="stats"></div><div id="people" class="tablewrap"><p class="subtle">Päringu tulemused ilmuvad siia.</p></div><details><summary>Vaata SPARQL-päringut</summary><pre id="query1"></pre><p><a id="link1" target="_blank" rel="noopener noreferrer">Ava see päring Wikidata Query Service'is ↗</a></p></details></section>
-<section class="card"><h2>2. päring: kus nad õppisid?</h2><p class="subtle">Õppeasutuste pingerida, mis põhineb Wikidatas märgitud hariduse (P69) väidetel. Üks inimene võib olla õppinud mitmes koolis.</p><div id="schools"><p class="subtle">Päringu tulemused ilmuvad siia.</p></div><details><summary>Vaata SPARQL-päringut</summary><pre id="query2"></pre><p><a id="link2" target="_blank" rel="noopener noreferrer">Ava see päring Wikidata Query Service'is ↗</a></p></details></section>
-<section class="card"><h2>Tulemuste kommentaar ja piirangud</h2><div class="notice"><strong>Oluline:</strong> need ei ole kõigi Eesti teatriinimeste täielikud nimekirjad. Kuvatakse vaid inimesi, kelle kohta on Wikidatas täpselt vastavad ametit ja kodakondsust kirjeldavad väited.</div>
-<p class="subtle"><strong>1. päring</strong> võimaldab võrrelda, kui palju sobivaid kirjeid leitakse eri ameti-, soo- ja sünniaastafiltritega. Tulemused kajastavad Wikidata andmete olemasolu, mitte Eesti teatri tegelikku koosseisu ega soolist jaotust.</p><p class="subtle"><strong>2. päring</strong> näitab kõige sagedamini märgitud õppeasutusi. Puuduvad kooliandmed ei tähenda, et inimene ei õppinud kusagil. Kui inimesel on mitu õppeasutust, arvestatakse teda iga vastava kooli juures. Väikeste tulemuste korral ei saa teha kaugeleulatuvaid järeldusi.</p>
-<p class="subtle">Kasutatud tunnused: P27 (kodakondsus) = Q191 (Eesti); P106 (amet); P21 (sugu); P569 (sünniaeg); P69 (õppeasutus). Näitleja = Q33999, teatrilavastaja = Q3387717. Päringutes kasutatakse SELECT, WHERE, OPTIONAL, FILTER, COUNT, GROUP BY ja LIMIT.</p></section>
-<footer>Õppeülesanne · Eesti teater Wikidatas · Allikas: <a href="https://www.wikidata.org/" target="_blank" rel="noopener noreferrer">Wikidata</a></footer>
-</main>
-<script>
-const el=id=>document.getElementById(id);
-const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const value=(row,key)=>row[key]?.value||'';
-const fmtYear=v=>v?/^[-+]?\d{4}/.exec(v)?.[0]||'—':'—';
-function settings(){return {job:el('job').value,gender:el('gender').value,year:el('year').value.trim(),limit:Number(el('limit').value)};}
-function filters(s){let f='?person wdt:P27 wd:Q191; wdt:P106 wd:'+s.job+' .\n';if(s.gender!=='all')f+='  ?person wdt:P21 wd:'+s.gender+' .\n';if(s.year!=='')f+='  ?person wdt:P569 ?birthDate .\n  FILTER(YEAR(?birthDate) >= '+Number(s.year)+')\n';return f;}
-function queryPeople(s){return 'SELECT DISTINCT ?person ?personLabel ?genderLabel ?birthDate WHERE {\n  '+filters(s)+'  OPTIONAL { ?person wdt:P21 ?gender. }\n  '+(s.year===''?'OPTIONAL { ?person wdt:P569 ?birthDate. }\n  ':'')+'SERVICE wikibase:label { bd:serviceParam wikibase:language "et,en". }\n}\nORDER BY LCASE(?personLabel)\nLIMIT '+s.limit;}
-function querySchools(s){return 'SELECT ?school ?schoolLabel (COUNT(DISTINCT ?person) AS ?count) WHERE {\n  '+filters(s)+'  ?person wdt:P69 ?school .\n  SERVICE wikibase:label { bd:serviceParam wikibase:language "et,en". }\n}\nGROUP BY ?school ?schoolLabel\nORDER BY DESC(?count)\nLIMIT '+s.limit;}
-function linkQuery(query){return 'https://query.wikidata.org/#'+encodeURIComponent(query);}
-async function wikidata(query){const url='https://query.wikidata.org/sparql?format=json&query='+encodeURIComponent(query);const response=await fetch(url,{headers:{Accept:'application/sparql-results+json'}});if(!response.ok)throw Error('Wikidata vastas veakoodiga '+response.status);const json=await response.json();return json.results.bindings;}
-function personHTML(rows){el('stats').innerHTML='<div class="stat"><strong>'+rows.length+'</strong><span>kuvatud kirjet</span></div>';if(!rows.length)return '<p>Vastavaid kirjeid ei leitud. Proovi muuta filtreid.</p>';return '<table><thead><tr><th>Nimi</th><th>Sugu (kui märgitud)</th><th>Sünniaasta</th></tr></thead><tbody>'+rows.map(r=>'<tr><td><a target="_blank" rel="noopener noreferrer" href="'+safe(value(r,'person'))+'">'+safe(value(r,'personLabel'))+'</a></td><td>'+safe(value(r,'genderLabel')||'—')+'</td><td>'+safe(fmtYear(value(r,'birthDate')))+'</td></tr>').join('')+'</tbody></table>';}
-function schoolHTML(rows){if(!rows.length)return '<p>Õppeasutuste kohta andmeid ei leitud. See ei tähenda, et neil inimestel puuduks haridus.</p>';const max=Math.max(...rows.map(r=>Number(value(r,'count'))));return '<p class="subtle">Leitud '+rows.length+' õppeasutust (kuni valitud piiranguni).</p>'+rows.map(r=>'<div class="school"><a href="'+safe(value(r,'school'))+'" target="_blank" rel="noopener noreferrer">'+safe(value(r,'schoolLabel'))+'</a><div class="track"><div class="fill" style="width:'+100*Number(value(r,'count'))/max+'%"></div></div><strong>'+safe(value(r,'count'))+'</strong></div>').join('');}
-let requestId=0;
-async function run(){const s=settings();if(s.year!==''&&(!Number.isInteger(Number(s.year))||Number(s.year)<1800||Number(s.year)>2026)){el('status').textContent='Sisesta sünniaasta vahemikus 1800–2026.';return;}
-const a=queryPeople(s),b=querySchools(s),id=++requestId;el('query1').textContent=a;el('query2').textContent=b;el('link1').href=linkQuery(a);el('link2').href=linkQuery(b);el('go').disabled=true;el('status').textContent='Laen Wikidata tulemusi…';el('people').innerHTML='<p class="subtle">Päring käib…</p>';el('schools').innerHTML='<p class="subtle">Päring käib…</p>';el('stats').innerHTML='';
-const results=await Promise.allSettled([wikidata(a),wikidata(b)]);if(id!==requestId)return;
-if(results[0].status==='fulfilled')el('people').innerHTML=personHTML(results[0].value);else el('people').innerHTML='<p>Esimene päring ebaõnnestus: '+safe(results[0].reason.message)+'. Proovi uuesti või ava päring Wikidatas.</p>';
-if(results[1].status==='fulfilled')el('schools').innerHTML=schoolHTML(results[1].value);else el('schools').innerHTML='<p>Teine päring ebaõnnestus: '+safe(results[1].reason.message)+'. Proovi uuesti või ava päring Wikidatas.</p>';
-el('status').textContent=results.every(r=>r.status==='fulfilled')?'Mõlemad päringud valmis.':'Vähemalt üks päring ebaõnnestus.';el('go').disabled=false;}
-el('go').addEventListener('click',run);run();
-</script>
-</body></html>
+  <h1>Teatriinimesed Wikidatas</h1>
+  <p>Vali riik ja vaata Wikidata päringute tulemusi.</p>
+  <label for="riik">Riik:</label>
+  <select id="riik" onchange="kysi()">
+    <option value="Q191">Eesti</option>
+    <option value="Q33">Soome</option>
+    <option value="Q34">Rootsi</option>
+  </select>
+  <button onclick="kysi()">Otsi</button>
+
+  <h2>1. Mitu näitlejat on ka teatrilavastajad?</h2>
+  <div id="vastus1" class="vastus"></div>
+
+  <h2>2. Millistes koolides on teatrilavastajad õppinud?</h2>
+  <div id="vastus2" class="vastus"></div>
+
+  <p class="selgitus">Andmed pärinevad Wikidatast. Tulemused kajastavad ainult neid ameteid ja õppeasutusi, mis on seal kirjas. Üks lavastaja võib olla õppinud mitmes koolis.</p>
+</body>
+</html>
