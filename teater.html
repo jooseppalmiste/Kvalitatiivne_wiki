@@ -8,7 +8,6 @@
       let amet = document.getElementById("amet").value;
       let ametinimi = document.getElementById("amet").selectedOptions[0].textContent.toLowerCase();
 
-      // 1. päring: millistes koolides on valitud ameti esindajad õppinud?
       let lause1 = `
         SELECT ?kool ?koolLabel (COUNT(DISTINCT ?isik) AS ?kogus)
         WHERE {
@@ -23,7 +22,6 @@
         ORDER BY DESC(?kogus)
       `;
 
-      // 2. päring: mitu valitud ameti esindajat on Wikidatas?
       let lause2 = `
         SELECT (COUNT(DISTINCT ?isik) AS ?kogus)
         WHERE {
