@@ -2,42 +2,19 @@
 <html lang="et">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Eesti teater Wikidatas</title>
-  <style>
-    body { font-family: Arial, sans-serif; max-width: 700px; margin: 35px auto; padding: 0 15px; line-height: 1.5; }
-    h1 { font-size: 25px; }
-    h2 { font-size: 19px; margin-top: 30px; }
-    select, button { padding: 7px; font-size: 15px; }
-    .vastus { margin: 13px 0; }
-    ul { padding-left: 22px; }
-    li { margin-bottom: 5px; }
-    .selgitus { font-size: 13px; color: #555; }
-  </style>
+  <title>Eesti teatriinimesed Wikidatas</title>
   <script>
     function kysi() {
-      let riigikood = document.getElementById("riik").value;
+      let amet = document.getElementById("amet").value;
+      let ametinimi = document.getElementById("amet").selectedOptions[0].textContent.toLowerCase();
 
-      // Päring 1: mitu inimest on korraga näitlejad ja teatrilavastajad?
+      // 1. päring: millistes koolides on valitud ameti esindajad õppinud?
       let lause1 = `
-        SELECT (COUNT(DISTINCT ?isik) AS ?kogus)
-        WHERE
-        {
-          ?isik wdt:P27 wd:${riigikood}.
-          ?isik wdt:P106 wd:Q33999.
-          ?isik wdt:P106 wd:Q3387717.
-        }
-      `;
-
-      // Päring 2: millistes koolides on teatrilavastajad õppinud?
-      let lause2 = `
         SELECT ?kool ?koolLabel (COUNT(DISTINCT ?isik) AS ?kogus)
-        WHERE
-        {
-          ?isik wdt:P27 wd:${riigikood}.
-          ?isik wdt:P106 wd:Q3387717.
+        WHERE {
+          ?isik wdt:P27 wd:Q191.
+          ?isik wdt:P106 wd:${amet}.
           ?isik wdt:P69 ?kool.
-
           SERVICE wikibase:label {
             bd:serviceParam wikibase:language "et,en".
           }
@@ -46,61 +23,60 @@
         ORDER BY DESC(?kogus)
       `;
 
+      // 2. päring: mitu valitud ameti esindajat on Wikidatas?
+      let lause2 = `
+        SELECT (COUNT(DISTINCT ?isik) AS ?kogus)
+        WHERE {
+          ?isik wdt:P27 wd:Q191.
+          ?isik wdt:P106 wd:${amet}.
+        }
+      `;
+
       let vastus1 = document.getElementById("vastus1");
       let vastus2 = document.getElementById("vastus2");
-      vastus1.textContent = "Ootan vastust...";
-      vastus2.textContent = "Ootan vastust...";
+      document.getElementById("kusimus1").textContent = "Millistes koolides on Eesti " + ametinimi + "d õppinud?";
+      document.getElementById("kusimus2").textContent = "Mitu Eesti " + ametinimi + "t on Wikidatas?";
+      vastus1.textContent = "ootan vastust";
+      vastus2.textContent = "ootan vastust";
 
       let aadress1 = "https://query.wikidata.org/sparql?format=json&query=" + encodeURIComponent(lause1);
       let aadress2 = "https://query.wikidata.org/sparql?format=json&query=" + encodeURIComponent(lause2);
 
       fetch(aadress1)
-        .then(d => { if (!d.ok) throw new Error("HTTP " + d.status); return d.json(); })
+        .then(d => { if (!d.ok) throw new Error("Viga"); return d.json(); })
         .then(d => {
-          let kogus = d.results.bindings[0]?.kogus?.value ?? "0";
-          vastus1.textContent = "Näitlejaid, kes on ka teatrilavastajad: " + kogus;
-        })
-        .catch(() => { vastus1.textContent = "Päring ei õnnestunud. Proovi uuesti."; });
-
-      fetch(aadress2)
-        .then(d => { if (!d.ok) throw new Error("HTTP " + d.status); return d.json(); })
-        .then(d => {
-          vastus2.textContent = "";
+          vastus1.textContent = "";
           let read = d.results.bindings;
-          if (read.length === 0) {
-            vastus2.textContent = "Koolide kohta andmeid ei leitud.";
-            return;
-          }
+          if (!read.length) { vastus1.textContent = "Tulemusi ei leitud."; return; }
           let loend = document.createElement("ul");
           for (let rida of read) {
             let li = document.createElement("li");
-            li.textContent = rida.koolLabel.value + " — " + rida.kogus.value + " lavastajat";
+            li.textContent = rida.koolLabel.value + " = " + rida.kogus.value;
             loend.appendChild(li);
           }
-          vastus2.appendChild(loend);
+          vastus1.appendChild(loend);
         })
-        .catch(() => { vastus2.textContent = "Päring ei õnnestunud. Proovi uuesti."; });
+        .catch(() => vastus1.textContent = "Päring ebaõnnestus.");
+
+      fetch(aadress2)
+        .then(d => { if (!d.ok) throw new Error("Viga"); return d.json(); })
+        .then(d => {
+          vastus2.textContent = d.results.bindings[0]?.kogus?.value ?? "0";
+        })
+        .catch(() => vastus2.textContent = "Päring ebaõnnestus.");
     }
     window.addEventListener("DOMContentLoaded", kysi);
   </script>
 </head>
 <body>
-  <h1>Teatriinimesed Wikidatas</h1>
-  <p>Vali riik ja vaata Wikidata päringute tulemusi.</p>
-  <label for="riik">Riik:</label>
-  <select id="riik" onchange="kysi()">
-    <option value="Q191">Eesti</option>
-    <option value="Q33">Soome</option>
-    <option value="Q34">Rootsi</option>
+  <select id="amet" onchange="kysi()">
+    <option value="Q33999">näitleja</option>
+    <option value="Q3387717">lavastaja</option>
   </select>
-  <button onclick="kysi()">Otsi</button>
-
-  <h2>1. Mitu näitlejat on ka teatrilavastajad?</h2>
-  <div id="vastus1" class="vastus"></div>
-
-  <h2>2. Millistes koolides on teatrilavastajad õppinud?</h2>
-  <div id="vastus2" class="vastus"></div>
-
-  <p class="selgitus">Andmed pärinevad Wikidatast. Tulemused kajastavad ainult neid ameteid ja õppeasutusi, mis on seal kirjas. Üks lavastaja võib olla õppinud mitmes koolis.</p>
+  <input type="button" value="otsi" onclick="kysi()">
+  <p id="kusimus1"></p>
+  <ul id="vastus1"></ul>
+  <p id="kusimus2"></p>
+  <div id="vastus2"></div>
 </body>
 </html>
