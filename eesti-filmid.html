@@ -46,7 +46,45 @@ const $=id=>document.getElementById(id);let data=[],films=[],actors=[];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const id=s=>s.split('/').at(-1);const year=s=>s&&/^\d{4}/.test(s)?+s.slice(0,4):null;
 function aggregate(){let fm=new Map(),am=new Map();for(let r of data){if(!fm.has(r.film))fm.set(r.film,{id:r.film,label:r.filmLabel,date:r.date,actors:new Set()});let f=fm.get(r.film);f.actors.add(r.actor);if(r.date&&(!f.date||r.date<f.date))f.date=r.date;if(!am.has(r.actor))am.set(r.actor,{id:r.actor,label:r.actorLabel,films:new Set()});am.get(r.actor).films.add(r.film)}films=[...fm.values()];actors=[...am.values()].sort((a,b)=>b.films.size-a.films.size||a.label.localeCompare(b.label));$('nFilms').textContent=films.length;$('nActors').textContent=actors.length;$('nLinks').textContent=data.length;}
-function renderBars(){let top=actors.slice(0,20),max=top[0]?.films.size||1;$('bars').innerHTML=top.map(a=>`<div class="barrow"><a target="_blank" rel="noopener" href="${a.id}">${esc(a.label)}</a><div class="bar" style="width:${100*a.films.size/max}%"></div><b>${a.films.size}</b></div>`).join('')||'Tulemusi pole.';let r=top.slice(0,15),out=['<svg viewBox="0 0 900 390" aria-label="Näitlejate filmide arvu mulldiagramm">'];r.forEach((a,i)=>{let x=85+(i%5)*180,y=70+Math.floor(i/5)*125,rad=12+Math.sqrt(a.films.size/max)*35;out.push(`<a href="${a.id}" target="_blank"><circle cx="${x}" cy="${y}" r="${rad}" fill="#aaa" opacity=".82"><title>${esc(a.label)}: ${a.films.size} filmi</title></circle><text x="${x}" y="${y+rad+15}" text-anchor="middle">${esc(a.label.slice(0,21))}</text></a>`)});$('bubbles').innerHTML=out.join('')+'</svg>';}
+const BUBBLE_QUERY=`#defaultView:BubbleChart
+SELECT ?actor ?actorLabel (COUNT(DISTINCT ?film) AS ?count)
+WHERE {
+  ?film wdt:P495 wd:Q191;
+        wdt:P161 ?actor.
+  SERVICE wikibase:label {
+    bd:serviceParam wikibase:language "et,en".
+  }
+}
+GROUP BY ?actor ?actorLabel
+HAVING (COUNT(DISTINCT ?film) >= 2)
+ORDER BY DESC(?count)
+LIMIT 15`;
+async function renderBars(){
+ const container=$('bars'), bubble=$('bubbles');
+ container.textContent='Laadin näitlejate filmide koguarve Wikidatast...';
+ bubble.textContent='';
+ try {
+   let url='https://query.wikidata.org/sparql?format=json&query='+encodeURIComponent(BUBBLE_QUERY);
+   let response=await fetch(url,{headers:{'Accept':'application/sparql-results+json'}});
+   if(!response.ok)throw Error('HTTP '+response.status);
+   let json=await response.json();
+   let top=json.results.bindings.map(b=>({id:b.actor.value,label:b.actorLabel.value,count:Number(b.count.value)})).filter(a=>a.count>0);
+   if(!top.length)throw Error('Tulemusi ei leitud');
+   let max=top[0].count;
+   container.innerHTML=top.map(a=>`<div class="barrow"><a target="_blank" rel="noopener" href="${a.id}">${esc(a.label)}</a><div class="bar" style="width:${100*a.count/max}%"></div><span>${a.count}</span></div>`).join('');
+   let out=['<svg viewBox="0 0 930 510" aria-label="Eesti filmides mänginud näitlejate arvupõhine mulldiagramm">'];
+   top.forEach((a,i)=>{
+     const x=90+(i%5)*185,y=79+Math.floor(i/5)*165;
+     // Mulli pindala on võrdeline filmide arvuga; väiksemad mullid jäävad nähtavaks.
+     const rad=6+Math.sqrt(a.count/max)*56;
+     out.push(`<a href="${a.id}" target="_blank" rel="noopener"><circle cx="${x}" cy="${y}" r="${rad}" fill="#aaa"><title>${esc(a.label)}: ${a.count} filmi</title></circle><text x="${x}" y="${y+4}" text-anchor="middle">${a.count}</text><text x="${x}" y="${y+rad+16}" text-anchor="middle">${esc(a.label.slice(0,23))}</text></a>`);
+   });
+   bubble.innerHTML=out.join('')+'</svg>';
+ } catch(e) {
+   container.textContent='Näitlejate koguarvu päring ebaõnnestus: '+e.message;
+   bubble.textContent='Proovi lehte hiljem uuesti laadida.';
+ }
+}
 function renderScatter(){
  let d=films.filter(f=>year(f.date)), xs=d.map(f=>year(f.date)),ys=d.map(f=>f.actors.size);
  if(!d.length){$('scatter').textContent='Ilmumisaastatega filme ei leitud.';return;}
