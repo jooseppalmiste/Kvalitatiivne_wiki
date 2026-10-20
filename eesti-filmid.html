@@ -24,9 +24,9 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 footer { margin: 35px 0; }
 h1,h2,h3,h4,h5,h6,b,strong,th,summary,.stat b,.year time { font-weight: normal; }
 </style></head><body><main><button id="load" hidden>Laadi uuesti</button><span id="status" role="status" hidden></span>
-<section><h2>Andmestiku ülevaade</h2><div class="grid"><div class="stat"><b id="nFilms">–</b>filmi</div><div class="stat"><b id="nActors">–</b>näitlejat</div><div class="stat"><b id="nLinks">–</b>filmi ja näitleja seost</div></div></section>
-<section><h2>1. Filmide arv näitleja kohta</h2><p class="muted">Mulldiagrammi kõrval alternatiivne järjestatud tulpdiagramm: mitu valimisse kuuluvat filmi on iga näitlejaga seotud.</p><div id="bars" class="chart">Laadi andmed.</div><h3>Mulldiagramm</h3><div id="bubbles" class="chart"></div></section>
-<section><h2>2. Filmide ajajoon</h2><p class="muted">Näitab filmide varaseimat Wikidatas märgitud avaldamisaastat. Kuupäevata filmid ajajoonele ei jõua.</p><div id="timeline" class="chart">Laadi andmed.</div></section>
+<section><h2>Andmestiku ülevaade (Wikidata kirjed)</h2><div class="grid"><div class="stat"><b id="nFilms">–</b>filmi</div><div class="stat"><b id="nActors">–</b>näitlejat</div><div class="stat"><b id="nLinks">–</b>Wikidata osatäitjaseost</div></div></section>
+<section><h2>1. Wikidatas märgitud filmid näitleja kohta</h2><div id="bars" class="chart">Laadi andmed.</div><h3>Mulldiagramm: Wikidata kirjete arv</h3><div id="bubbles" class="chart"></div></section>
+<section><h2>2. Wikidatas kirjeldatud filmide ajajoon</h2><div id="timeline" class="chart">Laadi andmed.</div></section>
 <section><h2>Hajuvusdiagramm: ilmumisaasta ja näitlejate arv</h2><p>Iga punkt on üks film. Horisontaalteljel on ilmumisaasta ja vertikaalteljel Wikidatas märgitud näitlejate arv. Punkti peale liikudes näed filmi nime.</p><div id="scatter" class="chart">Andmed laaditakse automaatselt.</div></section>
 <section><h2>Klõpsitav puu: filmid ja näitlejad</h2><p>Klõpsa filmi pealkirjal, et näha Wikidatas sellele filmile märgitud näitlejaid. Filmide ja näitlejate nimed viivad Wikidatasse.</p><div id="tree">Andmed laaditakse automaatselt.</div></section>
 <section><h2>3. Näitlejate ja filmide võrgustik</h2><p>Ümarad sõlmed tähistavad näitlejaid, ruudukujulised sõlmed filme. Ühendus tähendab, et Wikidata järgi mängis näitleja selles filmis. Klõpsa sõlmel Wikidata kirje avamiseks.</p><label>Näita kuni <input id="maxActors" type="number" min="5" max="60" value="25" style="width:70px"> näitlejat</label><button id="draw">Uuenda võrgustikku</button><div id="network"></div></section>
@@ -61,7 +61,7 @@ ORDER BY DESC(?count)
 LIMIT 15`;
 async function renderBars(){
  const container=$('bars'), bubble=$('bubbles');
- container.textContent='Laadin näitlejate filmide koguarve Wikidatast...';
+ container.textContent='Laadin Wikidatas kirjeldatud filmiseoseid...';
  bubble.textContent='';
  try {
    let url='https://query.wikidata.org/sparql?format=json&query='+encodeURIComponent(BUBBLE_QUERY);
@@ -72,16 +72,16 @@ async function renderBars(){
    if(!top.length)throw Error('Tulemusi ei leitud');
    let max=top[0].count;
    container.innerHTML=top.map(a=>`<div class="barrow"><a target="_blank" rel="noopener" href="${a.id}">${esc(a.label)}</a><div class="bar" style="width:${100*a.count/max}%"></div><span>${a.count}</span></div>`).join('');
-   let out=['<svg viewBox="0 0 930 510" aria-label="Eesti filmides mänginud näitlejate arvupõhine mulldiagramm">'];
+   let out=['<svg viewBox="0 0 930 510" aria-label="Wikidatas märgitud filmiseoste arv näitlejate kohta">'];
    top.forEach((a,i)=>{
      const x=90+(i%5)*185,y=79+Math.floor(i/5)*165;
      // Mulli pindala on võrdeline filmide arvuga; väiksemad mullid jäävad nähtavaks.
      const rad=6+Math.sqrt(a.count/max)*56;
-     out.push(`<a href="${a.id}" target="_blank" rel="noopener"><circle cx="${x}" cy="${y}" r="${rad}" fill="#aaa"><title>${esc(a.label)}: ${a.count} filmi</title></circle><text x="${x}" y="${y+4}" text-anchor="middle">${a.count}</text><text x="${x}" y="${y+rad+16}" text-anchor="middle">${esc(a.label.slice(0,23))}</text></a>`);
+     out.push(`<a href="${a.id}" target="_blank" rel="noopener"><circle cx="${x}" cy="${y}" r="${rad}" fill="#aaa"><title>${esc(a.label)}: ${a.count} Wikidatas kirjeldatud filmi</title></circle><text x="${x}" y="${y+4}" text-anchor="middle">${a.count}</text><text x="${x}" y="${y+rad+16}" text-anchor="middle">${esc(a.label.slice(0,23))}</text></a>`);
    });
    bubble.innerHTML=out.join('')+'</svg>';
  } catch(e) {
-   container.textContent='Näitlejate koguarvu päring ebaõnnestus: '+e.message;
+   container.textContent='Wikidata kirjete päring ebaõnnestus: '+e.message;
    bubble.textContent='Proovi lehte hiljem uuesti laadida.';
  }
 }
@@ -101,7 +101,7 @@ function renderTree(){
  let am=new Map(actors.map(a=>[a.id,a.label]));
  $('tree').innerHTML=films.slice().sort((a,b)=>a.label.localeCompare(b.label,'et')).map(f=>`<details><summary>${esc(f.label)} (${year(f.date)||'aasta puudub'}) — ${f.actors.size} näitlejat</summary><ul>${[...f.actors].sort((a,b)=>(am.get(a)||a).localeCompare(am.get(b)||b,'et')).map(a=>`<li><a href="${a}" target="_blank" rel="noopener">${esc(am.get(a)||id(a))}</a></li>`).join('')}</ul><a href="${f.id}" target="_blank" rel="noopener">Filmi Wikidata kirje</a></details>`).join('')||'Filme ei leitud.';
 }
-function renderTimeline(){let dated=films.filter(f=>year(f.date)).sort((a,b)=>year(a.date)-year(b.date));$('timeline').innerHTML=dated.slice(0,100).map(f=>`<div class="year"><time>${year(f.date)}</time><div><a target="_blank" rel="noopener" href="${f.id}">${esc(f.label)}</a><small class="muted"> · ${f.actors.size} näitlejat</small></div></div>`).join('')||'Wikidata vastustes puudusid kuupäevad.';}
+function renderTimeline(){let dated=films.filter(f=>year(f.date)).sort((a,b)=>year(a.date)-year(b.date));$('timeline').innerHTML=dated.slice(0,100).map(f=>`<div class="year"><time>${year(f.date)}</time><div><a target="_blank" rel="noopener" href="${f.id}">${esc(f.label)}</a></div></div>`).join('')||'Wikidata vastustes puudusid kuupäevad.';}
 function renderList(){let search=$('search').value.toLocaleLowerCase('et');$('filmList').innerHTML=films.filter(f=>f.label.toLocaleLowerCase('et').includes(search)).sort((a,b)=>a.label.localeCompare(b.label)).map(f=>`<div class="pill"><a target="_blank" rel="noopener" href="${f.id}">${esc(f.label)}</a> (${year(f.date)||'aasta puudub'})</div>`).join('')||'Sobivaid filme ei leitud.';}
 function network(){const limit=Math.min(60,Math.max(5,Number($('maxActors').value)||25)),chosen=actors.slice(0,limit),set=new Set(chosen.map(a=>a.id)),fs=films.filter(f=>[...f.actors].some(a=>set.has(a))).slice(0,100),nodes=[...chosen.map(a=>({...a,type:'actor'})),...fs.map(f=>({...f,type:'film'}))],edges=[];for(let f of fs)for(let a of f.actors)if(set.has(a))edges.push([a,f.id]);const w=980,h=510,cx=w/2,cy=h/2;let pos=new Map();nodes.forEach((n,i)=>{let ang=i*Math.PI*(3-Math.sqrt(5)),rad=17*Math.sqrt(i);pos.set(n.id,{x:cx+rad*Math.cos(ang),y:cy+rad*Math.sin(ang)})});for(let k=0;k<155;k++){let forces=new Map(nodes.map(n=>[n.id,{x:0,y:0}]));for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){let a=pos.get(nodes[i].id),b=pos.get(nodes[j].id),dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy+80,f=900/d2;forces.get(nodes[i].id).x+=dx*f;forces.get(nodes[i].id).y+=dy*f;forces.get(nodes[j].id).x-=dx*f;forces.get(nodes[j].id).y-=dy*f}for(let [s,t] of edges){let a=pos.get(s),b=pos.get(t),dx=b.x-a.x,dy=b.y-a.y,f=.004;forces.get(s).x+=dx*f;forces.get(s).y+=dy*f;forces.get(t).x-=dx*f;forces.get(t).y-=dy*f}for(let n of nodes){let p=pos.get(n.id),f=forces.get(n.id);p.x=Math.max(24,Math.min(w-24,p.x+Math.max(-8,Math.min(8,f.x+(cx-p.x)*.001))));p.y=Math.max(24,Math.min(h-24,p.y+Math.max(-8,Math.min(8,f.y+(cy-p.y)*.001))))}}let out=[`<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Filmide ja näitlejate seosevõrgustik">`];for(let [s,t] of edges){let a=pos.get(s),b=pos.get(t);out.push(`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#aaa" stroke-width="1"/>`)}for(let n of nodes){let p=pos.get(n.id),actor=n.type==='actor';out.push(`<a href="${n.id}" target="_blank"><title>${esc(n.label)} (${actor?'näitleja':'film'})</title>${actor?`<circle cx="${p.x}" cy="${p.y}" r="7" fill="#555"/>`:`<rect x="${p.x-5}" y="${p.y-5}" width="10" height="10" fill="#aaa"/>`}<text x="${p.x+10}" y="${p.y-6}" font-size="10">${esc(n.label.slice(0,24))}</text></a>`)}$('network').innerHTML=out.join('')+'</svg>';}
 function csvDownload(name,rows){let str=rows.map(r=>r.map(x=>'"'+String(x??'').replaceAll('"','""')+'"').join(',')).join('\r\n');let blob=new Blob(['\uFEFF'+str],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),500)}
