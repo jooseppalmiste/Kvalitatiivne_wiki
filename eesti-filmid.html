@@ -19,8 +19,8 @@ svg text { font-size: 12px; fill: black; }
 .year { margin: 7px 0; }
 .year time { font-weight: bold; margin-right: 15px; }
 .pill { display: inline-block; margin: 5px 10px 5px 0; }
-#network { height: 520px; border: 1px solid #aaa; }
-#network svg { height: 100%; min-width: 0; }
+#network { min-height: 570px; border: 1px solid #aaa; overflow-x: auto; }
+#network svg { height: auto; min-width: 850px; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 footer { margin: 35px 0; }
 h1,h2,h3,h4,h5,h6,b,strong,th,summary,.stat b,.year time { font-weight: normal; }
@@ -30,10 +30,19 @@ h1,h2,h3,h4,h5,h6,b,strong,th,summary,.stat b,.year time { font-weight: normal; 
 <section><h2>Filmide ajajoon</h2><div id="timeline" class="chart">Laadi andmed.</div></section>
 <section><h2>Hajuvusdiagramm: ilmumisaasta ja näitlejate arv</h2><div id="scatter" class="chart">Andmed laaditakse automaatselt.</div></section>
 <section><h2>Klõpsitav puu: filmid ja näitlejad</h2><div id="tree">Andmed laaditakse automaatselt.</div></section>
-<section><h2>Näitlejate ja filmide võrgustik</h2><label>Näita kuni <input id="maxActors" type="number" min="5" max="25" value="12" style="width:70px"> näitlejat</label><button id="draw">Uuenda võrgustikku</button><div id="network"></div></section>
+<section><h2>Näitlejate ja filmide võrgustik</h2><label>Näita <input id="maxActors" type="number" min="5" max="18" value="8" style="width:70px"> näitlejat</label><button id="draw">Uuenda võrgustikku</button><div id="network"></div></section>
 </main>
 <script>
-const QUERY=`SELECT ?film ?filmLabel ?actor ?actorLabel ?date WHERE { { SELECT ?film (MAX(?release) AS ?date) WHERE { ?film wdt:P495 wd:Q191; wdt:P161 ?cast; wdt:P577 ?release. FILTER(YEAR(?release) >= 2000 && YEAR(?release) <= 2026) } GROUP BY ?film ORDER BY DESC(?date) LIMIT 120 } ?film wdt:P161 ?actor. SERVICE wikibase:label { bd:serviceParam wikibase:language "et,en". } }`;
+const QUERY=`SELECT ?film ?filmLabel ?actor ?actorLabel ?date WHERE {
+ { SELECT ?film (MIN(?release) AS ?date) WHERE {
+   ?film wdt:P495 wd:Q191;
+         wdt:P161 ?cast;
+         wdt:P577 ?release.
+   FILTER(YEAR(?release) >= 1970 && YEAR(?release) <= 2026)
+ } GROUP BY ?film ORDER BY ?date LIMIT 240 }
+ ?film wdt:P161 ?actor.
+ SERVICE wikibase:label { bd:serviceParam wikibase:language "et,en". }
+}`;
 const $=id=>document.getElementById(id);let data=[],films=[],actors=[];
 
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -80,15 +89,20 @@ async function renderBars(){
  }
 }
 function renderScatter(){
- let d=films.filter(f=>year(f.date)), xs=d.map(f=>year(f.date)),ys=d.map(f=>f.actors.size);
- if(!d.length){$('scatter').textContent='Ilmumisaastatega filme ei leitud.';return;}
- let minX=Math.min(...xs),maxX=Math.max(...xs),maxY=Math.max(1,...ys),W=900,H=380,L=75,R=25,T=25,B=55;
- let px=x=>L+(x-minX)/Math.max(1,maxX-minX)*(W-L-R),py=y=>H-B-y/maxY*(H-T-B);
- let out=[`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Ilmumisaasta ja osatäitjate arvu hajuvusdiagramm"><line x1="${L}" y1="${T}" x2="${L}" y2="${H-B}" stroke="black"/><line x1="${L}" y1="${H-B}" x2="${W-R}" y2="${H-B}" stroke="black"/>`];
- for(let i=0;i<=5;i++){let y=maxY*i/5;out.push(`<text x="${L-10}" y="${py(y)+4}" text-anchor="end">${Math.round(y)}</text>`)}
- for(let i=0;i<=5;i++){let x=minX+(maxX-minX)*i/5;out.push(`<text x="${px(x)}" y="${H-B+20}" text-anchor="middle">${Math.round(x)}</text>`)}
- for(let f of d){out.push(`<a href="${f.id}" target="_blank" rel="noopener"><circle cx="${px(year(f.date))}" cy="${py(f.actors.size)}" r="5" fill="#555"><title>${esc(f.label)} (${year(f.date)}): ${f.actors.size} näitlejat</title></circle></a>`)}
- out.push(`<text x="${W/2}" y="${H-10}" text-anchor="middle">Ilmumisaasta</text><text x="15" y="${H/2}" transform="rotate(-90 15 ${H/2})" text-anchor="middle">Näitlejate arv Wikidatas</text></svg>`);
+ const d=films.filter(f=>year(f.date)>=1970&&year(f.date)<=2026).sort((a,b)=>year(a.date)-year(b.date));
+ if(!d.length){$('scatter').textContent='Kuupäevaga filme ei leitud.';return;}
+ const W=980,H=510,L=70,R=45,T=32,B=55, maxY=Math.max(5,...d.map(f=>f.actors.size));
+ const px=x=>L+(x-1970)/56*(W-L-R), py=y=>H-B-y/maxY*(H-T-B);
+ let out=[`<svg viewBox="0 0 ${W} ${H}" aria-label="1970–2026 filmide osatäitjate arv"><line x1="${L}" y1="${T}" x2="${L}" y2="${H-B}" stroke="black"/><line x1="${L}" y1="${H-B}" x2="${W-R}" y2="${H-B}" stroke="black"/>`];
+ for(let x=1970;x<=2020;x+=10)out.push(`<text x="${px(x)}" y="${H-B+20}" text-anchor="middle">${x}</text>`);
+ for(let i=0;i<=5;i++){let y=Math.round(maxY*i/5);out.push(`<text x="${L-13}" y="${py(y)+4}" text-anchor="end">${y}</text>`)}
+ const places=new Map();
+ for(let f of d){
+  let y=f.actors.size,key=year(f.date)+'-'+y,idx=places.get(key)||0;places.set(key,idx+1);
+  let dx=idx===0?0:((idx%2?1:-1)*Math.ceil(idx/2)*5);
+  out.push(`<a href="${f.id}" target="_blank" rel="noopener"><circle cx="${px(year(f.date))+dx}" cy="${py(y)}" r="4" fill="#555" opacity=".65"><title>${esc(f.label)} (${year(f.date)}): ${y} näitlejat</title></circle></a>`);
+ }
+ out.push(`<text x="${W/2}" y="${H-8}" text-anchor="middle">Ilmumisaasta</text><text x="15" y="${H/2}" transform="rotate(-90 15 ${H/2})" text-anchor="middle">Näitlejate arv</text></svg>`);
  $('scatter').innerHTML=out.join('');
 }
 function renderTree(){
@@ -98,35 +112,18 @@ function renderTree(){
 function renderTimeline(){let dated=films.filter(f=>year(f.date)).sort((a,b)=>year(a.date)-year(b.date));$('timeline').innerHTML=dated.slice(0,100).map(f=>`<div class="year"><time>${year(f.date)}</time><div><a target="_blank" rel="noopener" href="${f.id}">${esc(f.label)}</a></div></div>`).join('')||'Wikidata vastustes puudusid kuupäevad.';}
 function renderList(){let search=$('search').value.toLocaleLowerCase('et');$('filmList').innerHTML=films.filter(f=>f.label.toLocaleLowerCase('et').includes(search)).sort((a,b)=>a.label.localeCompare(b.label)).map(f=>`<div class="pill"><a target="_blank" rel="noopener" href="${f.id}">${esc(f.label)}</a> (${year(f.date)||'aasta puudub'})</div>`).join('')||'Sobivaid filme ei leitud.';}
 function network(){
- const limit=Math.min(25,Math.max(5,Number($('maxActors').value)||12));
- const chosen=actors.slice(0,limit), actorSet=new Set(chosen.map(a=>a.id));
- const fs=films.filter(f=>[...f.actors].some(a=>actorSet.has(a))).sort((a,b)=>b.actors.size-a.actors.size).slice(0,30);
- const nodes=[...chosen.map(a=>({...a,type:'actor'})),...fs.map(f=>({...f,type:'film'}))];
- const edges=[];
- for(let f of fs)for(let a of f.actors)if(actorSet.has(a))edges.push([a,f.id]);
- const W=980,H=590,cx=W/2,cy=H/2, pos=new Map();
- const total=nodes.length;
- nodes.forEach((n,i)=>{const angle=i*2.39996323,r=32+Math.sqrt(i/Math.max(1,total))*175;pos.set(n.id,{x:cx+Math.cos(angle)*r,y:cy+Math.sin(angle)*r})});
- const links=edges.map(([a,b])=>[pos.get(a),pos.get(b)]);
- for(let iteration=0;iteration<350;iteration++){
-   const forces=nodes.map(()=>({x:0,y:0}));const index=new Map(nodes.map((n,i)=>[n.id,i]));
-   for(let i=0;i<total;i++)for(let j=i+1;j<total;j++){
-     const a=pos.get(nodes[i].id),b=pos.get(nodes[j].id),dx=a.x-b.x,dy=a.y-b.y,dist2=dx*dx+dy*dy+1,repel=12000/dist2;
-     const fx=dx/Math.sqrt(dist2)*repel,fy=dy/Math.sqrt(dist2)*repel;
-     forces[i].x+=fx;forces[i].y+=fy;forces[j].x-=fx;forces[j].y-=fy;
-   }
-   for(let [a,b] of edges){let pa=pos.get(a),pb=pos.get(b),dx=pb.x-pa.x,dy=pb.y-pa.y,d=Math.max(1,Math.hypot(dx,dy));
-     const force=(d-105)*0.022,fx=dx/d*force,fy=dy/d*force;
-     forces[index.get(a)].x+=fx;forces[index.get(a)].y+=fy;
-     forces[index.get(b)].x-=fx;forces[index.get(b)].y-=fy;
-   }
-   nodes.forEach((n,i)=>{const p=pos.get(n.id),force=forces[i];p.x=Math.max(125,Math.min(W-125,p.x+Math.max(-9,Math.min(9,force.x+(cx-p.x)*0.012))));p.y=Math.max(90,Math.min(H-90,p.y+Math.max(-9,Math.min(9,force.y+(cy-p.y)*0.012))))});
- }
- const out=[`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Näitlejate ja filmide seosevõrgustik">`];
- for(let [a,b] of edges){let p=pos.get(a),q=pos.get(b);out.push(`<line x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}" stroke="#bbb" stroke-width=".8"/>`)}
- nodes.forEach(n=>{let p=pos.get(n.id),actor=n.type==='actor';
-   out.push(`<a href="${n.id}" target="_blank" rel="noopener" aria-label="${esc(n.label)}"><title>${esc(n.label)} (${actor?'näitleja':'film'})</title>${actor?`<circle cx="${p.x}" cy="${p.y}" r="6" fill="#555"/>`:`<rect x="${p.x-4}" y="${p.y-4}" width="8" height="8" fill="#aaa"/>`}</a>`);
- });
+ const limit=Math.min(18,Math.max(4,Number($('maxActors').value)||8));
+ const selected=actors.slice(0,limit), set=new Set(selected.map(a=>a.id));
+ const relevant=films.filter(f=>[...f.actors].some(a=>set.has(a))).sort((a,b)=>[...b.actors].filter(a=>set.has(a)).length-[...a.actors].filter(a=>set.has(a)).length).slice(0,16);
+ const chosen=selected.filter(a=>relevant.some(f=>f.actors.has(a.id)));
+ if(!relevant.length){$('network').textContent='Seoseid ei leitud.';return;}
+ const W=1100,H=Math.max(570,Math.max(chosen.length,relevant.length)*42+90);
+ const ay=i=>55+(i+.5)*(H-110)/chosen.length, fy=i=>55+(i+.5)*(H-110)/relevant.length;
+ const ap=new Map(chosen.map((a,i)=>[a.id,ay(i)]));
+ let out=[`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Näitlejate ja filmide võrgustik"><text x="235" y="25" text-anchor="end">Näitlejad</text><text x="750" y="25">Filmid</text>`];
+ relevant.forEach((f,i)=>{for(let a of f.actors)if(ap.has(a))out.push(`<line x1="270" y1="${ap.get(a)}" x2="735" y2="${fy(i)}" stroke="#bbb" stroke-width="1"/>`)});
+ chosen.forEach((a,i)=>out.push(`<a href="${a.id}" target="_blank" rel="noopener"><title>${esc(a.label)}</title><circle cx="270" cy="${ay(i)}" r="6" fill="#555"/><text x="255" y="${ay(i)+4}" text-anchor="end">${esc(a.label)}</text></a>`));
+ relevant.forEach((f,i)=>out.push(`<a href="${f.id}" target="_blank" rel="noopener"><title>${esc(f.label)}</title><rect x="730" y="${fy(i)-5}" width="10" height="10" fill="#888"/><text x="750" y="${fy(i)+4}">${esc(f.label.slice(0,43))}</text></a>`));
  $('network').innerHTML=out.join('')+'</svg>';
 }
 function csvDownload(name,rows){let str=rows.map(r=>r.map(x=>'"'+String(x??'').replaceAll('"','""')+'"').join(',')).join('\r\n');let blob=new Blob(['\uFEFF'+str],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),500)}
