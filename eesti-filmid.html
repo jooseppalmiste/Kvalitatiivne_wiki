@@ -22,8 +22,8 @@ svg text { font-size: 12px; fill: black; }
 #network svg { height: 100%; min-width: 0; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; }
 footer { margin: 35px 0; }
-</style></head><body><header><h1>Eesti filmid ja näitlejad Wikidatas</h1><p>Näitlejate ja filmide seosed, ajajoon ja diagrammid Wikidata andmete põhjal.</p></header>
-<main><section><h2>Andmete allikas</h2><p>Andmed pärinevad <a href="https://www.wikidata.org/" target="_blank" rel="noopener">Wikidatast</a> SPARQL-päringu kaudu. Kasutatakse filmi päritoluriiki (<code>P495 = Eesti</code>), osatäitjaid (<code>P161</code>) ja avaldamiskuupäeva (<code>P577</code>). Piirdume kuni 100 Wikidatas kirjeldatud näidisfilmiga, millel on osatäitjad; tulemused ei kirjelda kogu Eesti filmiajalugu.</p><button id="load">Laadi andmed uuesti</button> <span id="status" role="status" class="muted">Andmed laaditakse automaatselt.</span><details><summary>Vaata tegelikku SPARQL-päringut</summary><pre id="query"></pre><a id="queryLink" target="_blank" rel="noopener">Ava päring Wikidata Query Service'is</a></details></section>
+h1,h2,h3,h4,h5,h6,b,strong,th,summary,.stat b,.year time { font-weight: normal; }
+</style></head><body><main><button id="load" hidden>Laadi uuesti</button><span id="status" role="status" hidden></span>
 <section><h2>Andmestiku ülevaade</h2><div class="grid"><div class="stat"><b id="nFilms">–</b>filmi</div><div class="stat"><b id="nActors">–</b>näitlejat</div><div class="stat"><b id="nLinks">–</b>filmi ja näitleja seost</div></div></section>
 <section><h2>1. Filmide arv näitleja kohta</h2><p class="muted">Mulldiagrammi kõrval alternatiivne järjestatud tulpdiagramm: mitu valimisse kuuluvat filmi on iga näitlejaga seotud.</p><div id="bars" class="chart">Laadi andmed.</div><h3>Mulldiagramm</h3><div id="bubbles" class="chart"></div></section>
 <section><h2>2. Filmide ajajoon</h2><p class="muted">Näitab filmide varaseimat Wikidatas märgitud avaldamisaastat. Kuupäevata filmid ajajoonele ei jõua.</p><div id="timeline" class="chart">Laadi andmed.</div></section>
@@ -43,7 +43,7 @@ const QUERY=`SELECT ?film ?filmLabel ?actor ?actorLabel (MIN(?release) AS ?date)
   SERVICE wikibase:label { bd:serviceParam wikibase:language "et,en". }
 } GROUP BY ?film ?filmLabel ?actor ?actorLabel`;
 const $=id=>document.getElementById(id);let data=[],films=[],actors=[];
-$('query').textContent=QUERY;$('queryLink').href='https://query.wikidata.org/#'+encodeURIComponent(QUERY);
+
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const id=s=>s.split('/').at(-1);const year=s=>s&&/^\d{4}/.test(s)?+s.slice(0,4):null;
 function aggregate(){let fm=new Map(),am=new Map();for(let r of data){if(!fm.has(r.film))fm.set(r.film,{id:r.film,label:r.filmLabel,date:r.date,actors:new Set()});let f=fm.get(r.film);f.actors.add(r.actor);if(r.date&&(!f.date||r.date<f.date))f.date=r.date;if(!am.has(r.actor))am.set(r.actor,{id:r.actor,label:r.actorLabel,films:new Set()});am.get(r.actor).films.add(r.film)}films=[...fm.values()];actors=[...am.values()].sort((a,b)=>b.films.size-a.films.size||a.label.localeCompare(b.label));$('nFilms').textContent=films.length;$('nActors').textContent=actors.length;$('nLinks').textContent=data.length;}
