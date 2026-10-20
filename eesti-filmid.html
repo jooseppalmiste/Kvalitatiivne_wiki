@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="et"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Eesti filmid ja näitlejad | Wikidata praktikum</title>
+<title>Eesti filmid ja näitlejad | Wikidata praktikum (uuendatud)</title>
 <style>
 body { font-family: Arial, sans-serif; margin: 20px; max-width: 1000px; }
 section { margin-bottom: 35px; }
@@ -25,7 +25,7 @@ footer { margin: 35px 0; }
 h1,h2,h3,h4,h5,h6,b,strong,th,summary,.stat b,.year time { font-weight: normal; }
 </style></head><body><main><button id="load" hidden>Laadi uuesti</button><span id="status" role="status" hidden></span>
 <section><h2>Andmestiku ülevaade (Wikidata kirjed)</h2><div class="grid"><div class="stat"><b id="nFilms">–</b>filmi</div><div class="stat"><b id="nActors">–</b>näitlejat</div><div class="stat"><b id="nLinks">–</b>Wikidata osatäitjaseost</div></div></section>
-<section><h2>1. Wikidatas märgitud filmid näitleja kohta</h2><div id="bars" class="chart">Laadi andmed.</div><h3>Mulldiagramm: Wikidata kirjete arv</h3><div id="bubbles" class="chart"></div></section>
+<section><h2>1. Wikidatas märgitud filmid näitleja kohta</h2><div id="bars" class="chart">Laadi andmed.</div><h3>Mulldiagramm (Wikidatas seostatud filmide arv)</h3><div id="bubbles" class="chart"></div></section>
 <section><h2>2. Wikidatas kirjeldatud filmide ajajoon</h2><div id="timeline" class="chart">Laadi andmed.</div></section>
 <section><h2>Hajuvusdiagramm: ilmumisaasta ja näitlejate arv</h2><p>Iga punkt on üks film. Horisontaalteljel on ilmumisaasta ja vertikaalteljel Wikidatas märgitud näitlejate arv. Punkti peale liikudes näed filmi nime.</p><div id="scatter" class="chart">Andmed laaditakse automaatselt.</div></section>
 <section><h2>Klõpsitav puu: filmid ja näitlejad</h2><p>Klõpsa filmi pealkirjal, et näha Wikidatas sellele filmile märgitud näitlejaid. Filmide ja näitlejate nimed viivad Wikidatasse.</p><div id="tree">Andmed laaditakse automaatselt.</div></section>
@@ -70,14 +70,13 @@ async function renderBars(){
    let json=await response.json();
    let top=json.results.bindings.map(b=>({id:b.actor.value,label:b.actorLabel.value,count:Number(b.count.value)})).filter(a=>a.count>0);
    if(!top.length)throw Error('Tulemusi ei leitud');
-   let max=top[0].count;
+   let max=Math.max(...top.map(a=>a.count));
    container.innerHTML=top.map(a=>`<div class="barrow"><a target="_blank" rel="noopener" href="${a.id}">${esc(a.label)}</a><div class="bar" style="width:${100*a.count/max}%"></div><span>${a.count}</span></div>`).join('');
-   let out=['<svg viewBox="0 0 930 510" aria-label="Wikidatas märgitud filmiseoste arv näitlejate kohta">'];
+   let out=['<svg viewBox="0 0 1020 575" aria-label="Wikidata filmikirjete arvu võrdlev mulldiagramm">'];
    top.forEach((a,i)=>{
-     const x=90+(i%5)*185,y=79+Math.floor(i/5)*165;
-     // Mulli pindala on võrdeline filmide arvuga; väiksemad mullid jäävad nähtavaks.
-     const rad=6+Math.sqrt(a.count/max)*56;
-     out.push(`<a href="${a.id}" target="_blank" rel="noopener"><circle cx="${x}" cy="${y}" r="${rad}" fill="#aaa"><title>${esc(a.label)}: ${a.count} Wikidatas kirjeldatud filmi</title></circle><text x="${x}" y="${y+4}" text-anchor="middle">${a.count}</text><text x="${x}" y="${y+rad+16}" text-anchor="middle">${esc(a.label.slice(0,23))}</text></a>`);
+     const x=105+(i%5)*205,y=97+Math.floor(i/5)*190;
+     const rad=Math.sqrt(a.count/max)*71;
+     out.push(`<a href="${a.id}" target="_blank" rel="noopener"><circle cx="${x}" cy="${y}" r="${rad.toFixed(2)}" fill="#aaa" stroke="#666" stroke-width="1"><title>${esc(a.label)}: ${a.count} Wikidatas seostatud filmi</title></circle><text x="${x}" y="${y+5}" font-size="18" text-anchor="middle" fill="black">${a.count}</text><text x="${x}" y="${y+rad+18}" text-anchor="middle">${esc(a.label.slice(0,23))}</text></a>`);
    });
    bubble.innerHTML=out.join('')+'</svg>';
  } catch(e) {
